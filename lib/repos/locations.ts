@@ -163,6 +163,44 @@ export async function deleteDocType(id: string) {
   await tx.exec();
 }
 
+// ---------- "Forward to" picker ----------
+
+export type LocationGroup = {
+  division: { value: string; label: string };
+  units: { value: string; label: string }[];
+};
+
+/** Active divisions with their active units, for the "Forward to" dropdown. */
+export async function getLocationOptions(): Promise<LocationGroup[]> {
+  const [divisions, units] = await Promise.all([listDivisions(), listUnits()]);
+  return divisions
+    .filter((d) => d.active)
+    .map((d) => ({
+      division: { value: `division:${d.id}`, label: `${d.name} (whole division)` },
+      units: units
+        .filter((u) => u.active && u.divisionId === d.id)
+        .map((u) => ({ value: `unit:${u.id}`, label: `${u.name}` })),
+    }));
+}
+
+/** Resolves a picker value ("unit:abc" / "division:xyz") to an active location. */
+export async function resolveLocation(value: string) {
+  const [type, id] = value.split(":");
+  if (!id) return null;
+  if (type === "unit") {
+    const u = await getUnit(id);
+    if (!u?.active) return null;
+    const d = await getDivision(u.divisionId);
+    return { type: "unit" as const, id: u.id, name: d ? `${u.name} – ${d.code}` : u.name };
+  }
+  if (type === "division") {
+    const d = await getDivision(id);
+    if (!d?.active) return null;
+    return { type: "division" as const, id: d.id, name: d.name };
+  }
+  return null;
+}
+
 // ---------- dashboard ----------
 
 export async function getLocationCounts() {

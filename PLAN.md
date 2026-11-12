@@ -82,6 +82,14 @@ When you save, the system creates the tracking number and opens the **routing sl
 
 **Outgoing status flow:** `DRAFT / FOR SIGNATURE` (can be routed to units for signature or approval, the same way as incoming) → `RELEASED` (date released, released by) → `SERVED` (date served, received by) → `CLOSED`.
 
+### Rules settled while building Phase 3
+
+- **Due date (incoming):** Normal = the type's processing days, Urgent = half of that (at least 1 day), Rush = 1 day, counted from the date received. The form fills it in automatically, and you can change it. ↺ goes back to the automatic date.
+- **Due date (outgoing):** the type's processing days from the date prepared (used for overdue tracking).
+- **First routing (incoming)** is optional. Without it, the document stays with you as `RECEIVED`.
+- **Time zone:** dates and the `MMYY` in tracking numbers use `APP_TIMEZONE` (default `Asia/Manila`), because Vercel servers run in UTC.
+- **"Forward to" list** shows only active divisions and units.
+
 ### Quick action forms (on each document's page)
 
 | Action | Fields |
