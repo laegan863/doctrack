@@ -63,6 +63,8 @@ export type DocumentRecord = {
   remarks?: string;
 
   location?: LocationRef;
+  /** When the document arrived at its current location (for "time here"). */
+  locSince?: number;
 
   // Incoming
   receivedAt?: number;
@@ -112,4 +114,90 @@ export function subNumber(rootNo: string, seq: number) {
 export function rootOf(no: string) {
   const m = /^(IMISS-\d{4}-\d{3,})(?:-\d{2,})?$/i.exec(no.trim());
   return m ? m[1].toUpperCase() : null;
+}
+
+// ---------- routing actions (Phase 4) ----------
+
+export const ACTION_KINDS = [
+  "FORWARD",
+  "RECEIVE",
+  "ACT",
+  "RETURN",
+  "REPROCESS",
+  "RELEASE",
+  "SERVE",
+  "COMPLETE",
+  "REMARK",
+] as const;
+export type ActionKind = (typeof ACTION_KINDS)[number];
+
+export const ACTION_LABELS: Record<ActionKind, string> = {
+  FORWARD: "Forward",
+  RECEIVE: "Received by unit",
+  ACT: "Action taken",
+  RETURN: "Return to owner",
+  REPROCESS: "Re-process",
+  RELEASE: "Release",
+  SERVE: "Served",
+  COMPLETE: "Complete",
+  REMARK: "Add remark",
+};
+
+/** Statuses in which the current sub-transaction is still being processed. */
+export const OPEN_STATUSES: Status[] = [
+  "RECEIVED",
+  "PREPARED",
+  "FORWARDED",
+  "RECEIVED_BY_UNIT",
+  "ACTION_TAKEN",
+  "RELEASED",
+];
+
+export function isOpen(status: Status) {
+  return OPEN_STATUSES.includes(status);
+}
+
+/** Which actions make sense for a document in its current state. */
+export function availableActions(doc: Pick<DocumentRecord, "status" | "direction" | "location">): ActionKind[] {
+  const s = doc.status;
+  const out: ActionKind[] = [];
+  const processing = ["RECEIVED", "PREPARED", "FORWARDED", "RECEIVED_BY_UNIT", "ACTION_TAKEN"].includes(s);
+
+  if (s === "FORWARDED") out.push("RECEIVE");
+  if (doc.location && ["FORWARDED", "RECEIVED_BY_UNIT", "ACTION_TAKEN"].includes(s)) out.push("ACT");
+  if (processing) out.push("FORWARD");
+  if (doc.direction === "OUT" && processing) out.push("RELEASE");
+  if (doc.direction === "OUT" && s === "RELEASED") out.push("SERVE");
+  if (isOpen(s)) out.push("RETURN");
+  if (s === "RETURNED") out.push("REPROCESS");
+  if (isOpen(s) || s === "SERVED") out.push("COMPLETE");
+  out.push("REMARK");
+  return out;
+}
+
+/** A stop on a sub-transaction's route, with how long the document stayed there. */
+export type RouteStop = { location: LocationRef; from: number; to?: number };
+
+/** Builds the route (unit to unit) from a timeline. The last stop is open while the document is still there. */
+export function routeStops(timeline: TimelineEvent[], stillThere: boolean): RouteStop[] {
+  const stops: RouteStop[] = [];
+  for (const e of timeline) {
+    const leaves = e.type === "FORWARDED" || e.type === "RETURNED" || e.type === "COMPLETED" || e.type === "RELEASED";
+    const last = stops.at(-1);
+    if (leaves && last && last.to === undefined) last.to = e.at;
+    if (e.type === "FORWARDED" && e.location) stops.push({ location: e.location, from: e.at });
+  }
+  const last = stops.at(-1);
+  if (last && last.to === undefined && !stillThere) last.to = last.from;
+  return stops;
+}
+
+/** "3d 4h", "5h 12m", "8m" */
+export function formatDuration(ms: number) {
+  const m = Math.max(0, Math.floor(ms / 60000));
+  const d = Math.floor(m / 1440);
+  const h = Math.floor((m % 1440) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m % 60}m`;
+  return `${m}m`;
 }

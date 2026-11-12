@@ -90,6 +90,20 @@ When you save, the system creates the tracking number and opens the **routing sl
 - **Time zone:** dates and the `MMYY` in tracking numbers use `APP_TIMEZONE` (default `Asia/Manila`), because Vercel servers run in UTC.
 - **"Forward to" list** shows only active divisions and units.
 
+### When each action is offered (Phase 4)
+
+| Status | Actions shown |
+|---|---|
+| Received / Prepared (with you) | Forward, Release (OUT), Return, Complete, Remark |
+| Forwarded | Received by unit, Action taken, Forward, Release (OUT), Return, Complete, Remark |
+| Received by unit / Action taken | Action taken, Forward, Release (OUT), Return, Complete, Remark |
+| Released (OUT) | Served, Return, Complete, Remark |
+| Served (OUT) | Complete, Remark |
+| Returned to owner | Re-process (new sub-transaction), Remark |
+| Completed | Remark |
+
+The server checks the same rules again, so an old browser tab can't apply an action that no longer fits. Dates on actions can't be in the future.
+
 ### Quick action forms (on each document's page)
 
 | Action | Fields |

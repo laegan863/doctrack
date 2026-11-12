@@ -4,11 +4,14 @@ import { connection } from "next/server";
 import { Suspense, type ReactNode } from "react";
 import { DirectionBadge, PriorityBadge, StatusBadge } from "@/components/doc-badges";
 import { Card, RedisMissing } from "@/components/ui";
-import { STATUSES, type TimelineEvent } from "@/lib/documents";
+import { STATUSES, formatDuration, routeStops, type TimelineEvent } from "@/lib/documents";
 import { loadDocument } from "@/lib/load-document";
+import { getSuggestions } from "@/lib/repos/documents";
+import { getLocationOptions } from "@/lib/repos/locations";
 import { isRedisConfigured } from "@/lib/redis";
 import { requestNow } from "@/lib/request-time";
 import { formatDate, formatDateTime } from "@/lib/time";
+import { ActionPanel } from "./action-panel";
 
 export default function DocumentPage({ params }: PageProps<"/documents/[trackingNo]">) {
   return (
@@ -25,6 +28,7 @@ async function DocumentView({ params }: { params: Promise<{ trackingNo: string }
   if (!data) notFound();
   const { doc, subs } = data;
   const now = await requestNow();
+  const [locations, people] = await Promise.all([getLocationOptions(), getSuggestions("recipient")]);
   const overdue =
     doc.dueAt && doc.dueAt < now && !["COMPLETED", "ARCHIVED", "SERVED"].includes(doc.status);
 
@@ -41,10 +45,18 @@ async function DocumentView({ params }: { params: Promise<{ trackingNo: string }
             <StatusBadge status={doc.status} />
             <PriorityBadge priority={doc.priority} />
             {overdue && <span className="text-xs font-semibold text-red-600">OVERDUE</span>}
-            {doc.location && (
+            {doc.location ? (
               <span className="text-sm text-slate-500">
                 at <strong className="text-slate-700">{doc.location.name}</strong>
+                {doc.locSince && <> · {formatDuration(now - doc.locSince)}</>}
               </span>
+            ) : (
+              (doc.status === "RECEIVED" || doc.status === "PREPARED") && (
+                <span className="text-sm text-slate-500">with you</span>
+              )
+            )}
+            {doc.status === "RELEASED" && (
+              <span className="text-sm text-slate-500">out for service{doc.serviceMode ? ` (${doc.serviceMode})` : ""}</span>
             )}
           </div>
         </div>
@@ -56,7 +68,13 @@ async function DocumentView({ params }: { params: Promise<{ trackingNo: string }
         </Link>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+      <ActionPanel
+        doc={{ trackingNo: doc.trackingNo, status: doc.status, direction: doc.direction, location: doc.location }}
+        locations={locations}
+        people={people}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_24rem]">
         <Card className="p-5">
           <h2 className="mb-4 text-sm font-semibold">Details</h2>
           <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
@@ -108,18 +126,40 @@ async function DocumentView({ params }: { params: Promise<{ trackingNo: string }
           {subs
             .slice()
             .reverse()
-            .map((s) => (
-              <Card key={s.subNo} className="p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="font-mono text-sm font-semibold">{s.subNo}</span>
-                  <StatusBadge status={s.status} />
-                </div>
-                <Timeline events={s.timeline} />
-              </Card>
-            ))}
-          <p className="text-xs text-slate-400">
-            Routing actions (forward, receive, return, re-process) arrive in Phase 4.
-          </p>
+            .map((sub) => {
+              const current = sub.subNo === doc.currentSub;
+              const stops = routeStops(sub.timeline, current && !!doc.location);
+              return (
+                <Card key={sub.subNo} className={`p-4 ${current ? "ring-2 ring-indigo-200" : ""}`}>
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="font-mono text-sm font-semibold">{sub.subNo}</span>
+                    <div className="flex items-center gap-1.5">
+                      {current && <span className="text-[10px] font-semibold uppercase text-indigo-600">Current</span>}
+                      <StatusBadge status={sub.status} />
+                    </div>
+                  </div>
+                  {stops.length > 0 && (
+                    <ol className="mb-4 flex flex-wrap items-center gap-1 text-xs">
+                      {stops.map((st, i) => (
+                        <li key={i} className="flex items-center gap-1">
+                          {i > 0 && <span className="text-slate-300">→</span>}
+                          <span
+                            className={`rounded-md px-2 py-1 ${
+                              st.to === undefined ? "bg-amber-50 text-amber-800 ring-1 ring-amber-200" : "bg-slate-100 text-slate-700"
+                            }`}
+                            title={`${formatDateTime(st.from)} – ${st.to ? formatDateTime(st.to) : "now"}`}
+                          >
+                            {st.location.name}
+                            <span className="ml-1 text-slate-400">{formatDuration((st.to ?? now) - st.from)}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  <Timeline events={sub.timeline} />
+                </Card>
+              );
+            })}
         </div>
       </div>
     </div>
@@ -142,7 +182,7 @@ function Timeline({ events }: { events: TimelineEvent[] }) {
         <li key={i} className="relative">
           <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-indigo-500 ring-4 ring-white" />
           <div className="text-sm font-medium">
-            {e.type === "CREATED" || e.type === "REMARK" ? e.type : STATUSES[e.type]}
+            {e.type === "REMARK" ? "Remark" : e.type === "CREATED" ? "Created" : STATUSES[e.type]}
             {e.location && <span className="font-normal text-slate-500"> → {e.location.name}</span>}
           </div>
           <div className="text-xs text-slate-400">{formatDateTime(e.at)}</div>

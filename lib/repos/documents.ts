@@ -23,6 +23,19 @@ export const docKeys = {
   direction: (d: string) => `docs:dir:${d}`,
   location: (l: LocationRef) => `docs:loc:${l.type}:${l.id}`,
   suggest: (kind: SuggestKind) => `suggest:${kind}`,
+  /** Most recent actions across all documents (newest first, capped). */
+  activity: "activity",
+};
+
+const ACTIVITY_MAX = 500;
+
+export type ActivityEntry = {
+  at: number;
+  trackingNo: string;
+  subNo: string;
+  type: TimelineEvent["type"];
+  subject: string;
+  location?: LocationRef;
 };
 
 export type SuggestKind = "sender" | "office" | "recipient";
@@ -87,6 +100,7 @@ function toDocument(r: Raw): DocumentRecord {
     dueAt: num(r.dueAt),
     remarks: str(r.remarks),
     location: readLocation(r),
+    locSince: num(r.locSince),
     receivedAt: num(r.receivedAt),
     receivedVia: str(r.receivedVia),
     senderName: str(r.senderName),
@@ -146,6 +160,7 @@ export async function createDocument(
     subCount: 1,
     createdAt: now,
     updatedAt: now,
+    locSince: input.location ? now : undefined,
   };
   const sub: SubTransaction = {
     subNo,
@@ -175,12 +190,118 @@ export async function createDocument(
     tx.hset(key(doc.location.id), { used: true });
   }
 
+  tx.lpush(docKeys.activity, {
+    at: now,
+    trackingNo,
+    subNo,
+    type: doc.status,
+    subject: doc.subject,
+    location: doc.location,
+  } satisfies ActivityEntry);
+  tx.ltrim(docKeys.activity, 0, ACTIVITY_MAX - 1);
+
   for (const [kind, values] of Object.entries(suggestions) as [SuggestKind, (string | undefined)[]][]) {
     for (const v of values) if (v) tx.zincrby(docKeys.suggest(kind), 1, v);
   }
 
   await tx.exec();
   return doc;
+}
+
+// ---------- transitions (Phase 4) ----------
+
+export type Transition = {
+  /** New status for the document and its current sub-transaction. */
+  status?: Status;
+  /** New location; `null` clears it (back with the owner / finished). Omit to keep. */
+  location?: LocationRef | null;
+  /** Close the current sub-transaction (Return / Complete / Served). */
+  closeSub?: boolean;
+  /** Start a new sub-transaction (Re-process). Its first event is `event`. */
+  newSub?: boolean;
+  /** Timeline entry to record. `at` defaults to now. */
+  event: Omit<TimelineEvent, "at"> & { at?: number };
+  /** Extra document fields to update (e.g. served date, mode of service). */
+  fields?: Partial<DocumentRecord>;
+  suggestions?: Partial<Record<SuggestKind, (string | undefined)[]>>;
+};
+
+/** Applies one routing action to a document and keeps every index in sync. */
+export async function applyTransition(doc: DocumentRecord, t: Transition) {
+  const now = Date.now();
+  const tx = redis().multi();
+  const no = doc.trackingNo;
+
+  let subNo = doc.currentSub;
+  let subCount = doc.subCount;
+  if (t.newSub) {
+    subCount += 1;
+    subNo = subNumber(no, subCount);
+    tx.rpush(docKeys.subs(no), subNo);
+    tx.hset(docKeys.sub(subNo), { subNo, rootNo: no, seq: subCount, status: t.status ?? doc.status, startedAt: now });
+  }
+
+  const status = t.status ?? doc.status;
+  const location = t.location === undefined ? doc.location : (t.location ?? undefined);
+  const moved =
+    t.location !== undefined &&
+    (location?.type !== doc.location?.type || location?.id !== doc.location?.id);
+
+  // Document hash
+  const docFields: Record<string, unknown> = { ...t.fields, status, currentSub: subNo, subCount, updatedAt: now };
+  if (moved) {
+    tx.hdel(docKeys.doc(no), "locType", "locId", "locName", "locSince");
+    if (location) Object.assign(docFields, { location, locSince: now });
+  }
+  tx.hset(docKeys.doc(no), flatten(docFields));
+
+  // Current sub-transaction hash
+  const subFields: Record<string, unknown> = { status };
+  if (moved) {
+    tx.hdel(docKeys.sub(subNo), "locType", "locId", "locName");
+    if (location) subFields.location = location;
+  }
+  if (t.closeSub) subFields.endedAt = now;
+  tx.hset(docKeys.sub(subNo), flatten(subFields));
+
+  // Timeline + activity feed
+  const event: TimelineEvent = { ...t.event, at: t.event.at ?? now };
+  tx.rpush(docKeys.timeline(subNo), event);
+  tx.lpush(docKeys.activity, {
+    at: event.at,
+    trackingNo: no,
+    subNo,
+    type: event.type,
+    subject: doc.subject,
+    location: event.location,
+  } satisfies ActivityEntry);
+  tx.ltrim(docKeys.activity, 0, ACTIVITY_MAX - 1);
+
+  // Indexes
+  if (status !== doc.status) {
+    tx.srem(docKeys.status(doc.status), no);
+    tx.sadd(docKeys.status(status), no);
+  }
+  if (moved) {
+    if (doc.location) tx.srem(docKeys.location(doc.location), no);
+    if (location) {
+      tx.sadd(docKeys.location(location), no);
+      const key = location.type === "unit" ? locKeys.unit : locKeys.division;
+      tx.hset(key(location.id), { used: true });
+    }
+  }
+  // Finished documents can no longer be overdue.
+  if (status === "COMPLETED" || status === "SERVED" || status === "ARCHIVED") tx.zrem(docKeys.due, no);
+  else if (doc.dueAt && !["COMPLETED", "SERVED", "ARCHIVED"].includes(status)) {
+    tx.zadd(docKeys.due, { score: doc.dueAt, member: no });
+  }
+
+  for (const [kind, values] of Object.entries(t.suggestions ?? {}) as [SuggestKind, (string | undefined)[]][]) {
+    for (const v of values) if (v) tx.zincrby(docKeys.suggest(kind), 1, v);
+  }
+
+  await tx.exec();
+  return { subNo };
 }
 
 // ---------- read ----------
@@ -205,6 +326,27 @@ export async function getSubTransactions(trackingNo: string) {
       typeof e === "string" ? (JSON.parse(e) as TimelineEvent) : e,
     ),
   }));
+}
+
+/** Loads many documents at once (missing ones are skipped). */
+export async function getDocuments(trackingNos: string[]) {
+  if (trackingNos.length === 0) return [];
+  const p = redis().pipeline();
+  for (const no of trackingNos) p.hgetall(docKeys.doc(no));
+  const rows = (await p.exec()) as (Raw | null)[];
+  return rows.filter((r): r is Raw => !!r && Object.keys(r).length > 0).map(toDocument);
+}
+
+/** Documents currently at a location, or with you (no location, still open or returned). */
+export async function getDocumentsAt(loc: LocationRef) {
+  return getDocuments(await redis().smembers(docKeys.location(loc)));
+}
+
+export async function getDocumentsWithStatus(statuses: Status[]) {
+  const p = redis().pipeline();
+  for (const s of statuses) p.smembers(docKeys.status(s));
+  const lists = (await p.exec()) as string[][];
+  return getDocuments([...new Set(lists.flat())]);
 }
 
 export async function getSuggestions(kind: SuggestKind, limit = 300) {
