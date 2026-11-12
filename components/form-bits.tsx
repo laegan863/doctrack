@@ -29,6 +29,8 @@ export function LocationSelect({
   groups,
   required,
   defaultValue,
+  value,
+  onChange,
   placeholder = "Select division or unit…",
 }: {
   id: string;
@@ -36,10 +38,15 @@ export function LocationSelect({
   groups: LocationGroup[];
   required?: boolean;
   defaultValue?: string;
+  /** Controlled mode (with onChange). */
+  value?: string;
+  onChange?: (value: string) => void;
   placeholder?: string;
 }) {
+  const valueProps =
+    value !== undefined ? { value, onChange: (e: { target: { value: string } }) => onChange?.(e.target.value) } : { defaultValue: defaultValue ?? "" };
   return (
-    <select id={id} name={name} required={required} defaultValue={defaultValue ?? ""} className={inputClass}>
+    <select id={id} name={name} required={required} {...valueProps} className={inputClass}>
       <option value="">{placeholder}</option>
       {groups.map((g) => (
         <optgroup key={g.division.value} label={g.division.label.replace(" (whole division)", "")}>

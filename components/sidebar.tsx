@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 import { logout } from "@/app/login/actions";
+import { CommandPalette } from "./command-palette";
 
 type NavItem = { href: string; label: string; icon: string; ready: boolean };
 
@@ -15,7 +16,7 @@ const sections: { title?: string; items: NavItem[] }[] = [
       { href: "/outgoing/new", label: "New Outgoing", icon: "↑", ready: true },
       { href: "/documents", label: "Documents", icon: "☰", ready: false },
       { href: "/locations", label: "Where are my documents?", icon: "⌖", ready: true },
-      { href: "/search", label: "Search", icon: "⌕", ready: false },
+      { href: "/search", label: "Search", icon: "⌕", ready: true },
       { href: "/reports", label: "Reports", icon: "▤", ready: false },
     ],
   },
@@ -30,6 +31,7 @@ const sections: { title?: string; items: NavItem[] }[] = [
 
 export function Sidebar() {
   const [open, setOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const close = () => setOpen(false);
 
   return (
@@ -37,6 +39,14 @@ export function Sidebar() {
       {/* Mobile top bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 lg:hidden print:hidden">
         <span className="font-semibold">DocTrack</span>
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="ml-auto mr-2 rounded-md px-2 py-1 text-slate-600 ring-1 ring-slate-300"
+          aria-label="Search"
+        >
+          ⌕
+        </button>
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -60,6 +70,21 @@ export function Sidebar() {
           </div>
         </div>
 
+        <div className="px-3 pb-2">
+          <button
+            type="button"
+            onClick={() => {
+              setSearchOpen(true);
+              close();
+            }}
+            className="flex w-full items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-left text-sm text-slate-500 ring-1 ring-slate-200 hover:bg-slate-200/60"
+          >
+            <span>⌕</span>
+            Search…
+            <kbd className="ml-auto rounded border border-slate-300 bg-white px-1.5 text-[10px] text-slate-500">Ctrl K</kbd>
+          </button>
+        </div>
+
         <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-2">
           {/* The active highlight needs the URL, which is request-time data: stream it in. */}
           <Suspense fallback={<NavSections pathname={null} onNavigate={close} />}>
@@ -76,6 +101,8 @@ export function Sidebar() {
           </button>
         </form>
       </aside>
+
+      <CommandPalette open={searchOpen} onOpenChange={setSearchOpen} />
     </>
   );
 }

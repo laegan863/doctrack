@@ -12,6 +12,7 @@ import {
   type Priority,
 } from "@/lib/documents";
 import { createDocument } from "@/lib/repos/documents";
+import { reindexDocument } from "@/lib/repos/search";
 import { getDocType, resolveLocation } from "@/lib/repos/locations";
 import { addDays, endOfDayZoned, parseZoned, toDateInput } from "@/lib/time";
 import type { FormState } from "@/lib/types";
@@ -142,6 +143,7 @@ export async function createIncoming(_: FormState, formData: FormData): Promise<
       { sender: [f.senderName], office: [f.senderOffice] },
     );
     trackingNo = doc.trackingNo;
+    await reindexDocument(trackingNo);
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Could not save the document.",
@@ -200,6 +202,7 @@ export async function createOutgoing(_: FormState, formData: FormData): Promise<
       { recipient: [f.receivedByName], office: [f.receivedByOffice] },
     );
     trackingNo = doc.trackingNo;
+    await reindexDocument(trackingNo);
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Could not save the document.",

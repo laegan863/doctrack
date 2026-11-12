@@ -13,6 +13,7 @@ import {
 } from "@/lib/documents";
 import { applyTransition, getDocument, type Transition } from "@/lib/repos/documents";
 import { resolveLocation } from "@/lib/repos/locations";
+import { reindexDocument } from "@/lib/repos/search";
 import { parseZoned } from "@/lib/time";
 import type { FormState } from "@/lib/types";
 
@@ -81,6 +82,7 @@ export async function performAction(_: FormState, formData: FormData): Promise<F
 
     const t = await buildTransition(kind, parsed.data as never);
     await applyTransition(doc, t);
+    await reindexDocument(doc.trackingNo);
     refresh();
     return { ok: true };
   } catch (err) {
