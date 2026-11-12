@@ -63,8 +63,8 @@ async function Slip({ params }: { params: Promise<{ trackingNo: string }> }) {
       </div>
 
       {/* The printable sheet */}
-      <article className="mx-auto max-w-[210mm] bg-white p-8 text-[13px] text-slate-900 shadow-sm ring-1 ring-slate-200 print:max-w-none print:p-0 print:shadow-none print:ring-0">
-        <header className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-4">
+      <article className="mx-auto max-w-[210mm] bg-white p-4 sm:p-8 text-[13px] text-slate-900 shadow-sm ring-1 ring-slate-200 print:max-w-none print:p-0 print:shadow-none print:ring-0">
+        <header className="flex flex-col gap-4 border-b-2 border-slate-900 pb-4 sm:flex-row sm:items-start sm:justify-between print:flex-row print:items-start print:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">IMISS</div>
             <h1 className="text-xl font-bold">DOCUMENT ROUTING SLIP</h1>

@@ -56,8 +56,11 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Tap outside the menu to close it (phones). */}
+      {open && <div className="fixed inset-0 z-30 bg-slate-900/30 lg:hidden print:hidden" onClick={close} aria-hidden />}
+
       <aside
-        className={`${open ? "block" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col border-r border-slate-200 bg-white lg:flex print:hidden`}
+        className={`${open ? "flex" : "hidden"} fixed inset-y-0 left-0 z-40 w-64 flex-col border-r border-slate-200 bg-white lg:flex print:hidden`}
       >
         <div className="flex items-center gap-3 px-5 py-5">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">

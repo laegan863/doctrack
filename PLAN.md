@@ -1,6 +1,6 @@
 # DocTrack — Document Tracking System: Development Plan
 
-> Status: **Waiting for approval.** No application code has been written yet.
+> Status: **Built.** Phases 1–7 are complete. See README.md for setup and the Vercel deployment guide.
 
 ## 1. Goal
 

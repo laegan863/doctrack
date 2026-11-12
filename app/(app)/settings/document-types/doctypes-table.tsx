@@ -26,6 +26,7 @@ export function DocTypesTable({ types }: { types: DocType[] }) {
       )}
 
       <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -48,6 +49,7 @@ export function DocTypesTable({ types }: { types: DocType[] }) {
             )}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );

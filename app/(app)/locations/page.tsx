@@ -48,7 +48,7 @@ async function Board() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Out in divisions & units" value={allOut.length} />
         <Stat label="With you" value={withYou.length} />
         <Stat label="Returned to owner" value={returned.length} />

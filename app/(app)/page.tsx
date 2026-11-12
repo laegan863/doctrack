@@ -73,7 +73,7 @@ async function DashboardBody() {
         </Banner>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <Stat label="Received today" value={counts.receivedToday} hint={counts.preparedToday ? `+ ${counts.preparedToday} outgoing prepared` : undefined} href="/reports/register" />
         <Stat label="Out in divisions & units" value={counts.out} href="/locations" />
         <Stat label="With you" value={counts.withYou} href="/locations" />
