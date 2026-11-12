@@ -89,3 +89,13 @@ export function addDays(dateValue: string, days: number) {
   const dt = new Date(Date.UTC(y, m - 1, d + days));
   return dt.toISOString().slice(0, 10);
 }
+
+/** Start of the day (00:00 office time) containing `epoch`. */
+export function startOfDayZoned(epoch: number) {
+  return parseZoned(toDateInput(epoch));
+}
+
+/** First day of the month containing `epoch`, as "YYYY-MM-DD". */
+export function monthStartInput(epoch: number) {
+  return `${toDateInput(epoch).slice(0, 8)}01`;
+}

@@ -14,10 +14,9 @@ const sections: { title?: string; items: NavItem[] }[] = [
       { href: "/", label: "Dashboard", icon: "▦", ready: true },
       { href: "/incoming/new", label: "New Incoming", icon: "↓", ready: true },
       { href: "/outgoing/new", label: "New Outgoing", icon: "↑", ready: true },
-      { href: "/documents", label: "Documents", icon: "☰", ready: false },
       { href: "/locations", label: "Where are my documents?", icon: "⌖", ready: true },
-      { href: "/search", label: "Search", icon: "⌕", ready: true },
-      { href: "/reports", label: "Reports", icon: "▤", ready: false },
+      { href: "/search", label: "Documents & Search", icon: "☰", ready: true },
+      { href: "/reports", label: "Reports", icon: "▤", ready: true },
     ],
   },
   {

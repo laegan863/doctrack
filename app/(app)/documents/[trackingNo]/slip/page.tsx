@@ -11,7 +11,7 @@ import { loadDocument } from "@/lib/load-document";
 import { isRedisConfigured } from "@/lib/redis";
 import { requestNow } from "@/lib/request-time";
 import { formatDate, formatDateTime } from "@/lib/time";
-import { PrintButton } from "./print-button";
+import { PrintButton } from "@/components/print-button";
 
 export const metadata: Metadata = { title: "Routing Slip · DocTrack" };
 
