@@ -22,8 +22,8 @@ const sections: { title?: string; items: NavItem[] }[] = [
   {
     title: "Settings",
     items: [
-      { href: "/settings/divisions", label: "Divisions & Units", icon: "⚑", ready: false },
-      { href: "/settings/document-types", label: "Document Types", icon: "⚙", ready: false },
+      { href: "/settings/divisions", label: "Divisions & Units", icon: "⚑", ready: true },
+      { href: "/settings/document-types", label: "Document Types", icon: "⚙", ready: true },
     ],
   },
 ];
